@@ -1,4 +1,4 @@
-<!-- vs-studio5000-guide v2 -->
+<!-- vs-studio5000-guide v3 -->
 # Studio 5000 projects in this workspace
 
 This folder contains Rockwell Studio 5000 Logix Designer projects. The **VS Studio 5000**
@@ -93,20 +93,8 @@ FBD and SFC routines (from an L5X) are exported as a **read-only** text view in 
 FBD wire as `Block.Pin := Source;`, each SFC step with its actions, each transition as
 `Transition := condition;`. Read them; do not edit them (they are not packaged).
 
-## Making changes
-
-1. Edit the `.rll` / `.st` files in the export folder. Keep the `// @` header lines.
-2. Check tags exist (`TAGS.md`) and the instruction syntax matches existing logic. New tags must be
-   created by the user in Studio 5000, so list any you introduce.
-3. Ask the user to run **Studio 5000: Build L5X Import from Edits**. It validates each edited routine
-   (ladder: rung structure, instructions; ST: brackets, comments, IF/CASE/FOR/WHILE/REPEAT blocks;
-   both: tags and JSR targets) and writes `edits/<Program>__<Routine>.L5X` plus `edits/IMPORT_REPORT.md`.
-4. Re-exporting keeps edited files, so they are not lost if the project reloads.
-   **Studio 5000: Discard Edits** restores them.
-
-AOI logic cannot be packaged as a routine (the AOI definition is edited in Studio 5000), and
-FBD/SFC views and source-protected routines cannot be packaged. The report says so.
-
+{{MAKING_CHANGES}}
+{{RUNG_PREVIEW}}
 ## Safety
 
 This is industrial control code that moves real machinery. Before proposing changes, trace the
