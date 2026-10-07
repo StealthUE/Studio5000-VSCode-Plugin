@@ -37,13 +37,106 @@ function projectTable(folder: string, projects: ProjectEntry[]): string {
   return rows.join('\n');
 }
 
+export interface GuideFlags {
+  /** When true, the assistant edits the export and the user imports the L5X. Default off: instructions only. */
+  editFileGenerated?: boolean;
+  /** In chat, show a rung as a ladder picture instead of its neutral text. Default on. */
+  rungPreview?: boolean;
+}
+
+const FILE_STEPS = [
+  '1. Edit the `.rll` / `.st` files in the export folder. Keep the `// @` header lines.',
+  '2. Check tags exist (`TAGS.md`) and the instruction syntax matches existing logic. New tags must be',
+  '   created by the user in Studio 5000, so list any you introduce.',
+  '3. Ask the user to run **Studio 5000: Build L5X Import from Edits**. It validates each edited routine',
+  '   (ladder: rung structure, instructions; ST: brackets, comments, IF/CASE/FOR/WHILE/REPEAT blocks;',
+  '   both: tags and JSR targets) and writes `edits/<Program>__<Routine>.L5X` plus `edits/IMPORT_REPORT.md`.',
+  '4. Re-exporting keeps edited files, so they are not lost if the project reloads.',
+  '   **Studio 5000: Discard Edits** restores them.',
+];
+
+const NOT_PACKAGED = [
+  'AOI logic cannot be packaged as a routine (the AOI definition is edited in Studio 5000), and',
+  'FBD/SFC views and source-protected routines cannot be packaged. The report says so.',
+];
+
+/**
+ * The "Making changes" section. `editFile` is `studio5000.editFileGenerated`.
+ * On: edit the export and hand back an L5X to import. Off: instructions only.
+ */
+export function makingChangesGuide(editFile: boolean): string {
+  if (!editFile) {
+    return [
+      '## Making changes',
+      '',
+      'Do not edit the export. Give the user the change to make themselves in Studio 5000: the program,',
+      'the routine, the rung number or ST line, the rung comment, and the exact neutral text or',
+      'Structured Text to enter. List any new tags they must create. Leave every file as it is.',
+      '',
+    ].join('\n');
+  }
+  return [
+    '## Making changes',
+    '',
+    'Edit the export and give the user the file to import into Studio 5000.',
+    '',
+    ...FILE_STEPS,
+    '',
+    ...NOT_PACKAGED,
+    '',
+  ].join('\n');
+}
+
+/** The "Rung previews" section. `enabled` is `studio5000.rungPreview`. */
+export function rungPreviewGuide(enabled: boolean): string {
+  if (!enabled) {
+    return [
+      '## Rung previews',
+      '',
+      'Rung preview is off (`studio5000.rungPreview`). The Preview Rung command is hidden. When you',
+      'show a rung, show its comment and neutral text only. Do not make a ladder image.',
+      '',
+    ].join('\n');
+  }
+  return [
+    '## Rung previews',
+    '',
+    'Rung preview is on (`studio5000.rungPreview`). When you show one rung, or propose a change to',
+    'one, show a ladder picture of that rung in the chat instead of its neutral text. The picture',
+    'already contains the comment, the diagram and the neutral text. Do not draw the ladder yourself,',
+    'and do not paste the neutral text as well. For a change, show the current picture and the',
+    'proposed picture. A long list (a whole cross reference) stays text; preview the rung you are',
+    'discussing. Structured Text has no ladder preview; keep showing the source.',
+    '',
+    'The picture is drawn from the rung text. The command prints the path of an SVG. Show that image.',
+    '',
+    '```',
+    'node "{{CLI}}" preview "<export folder>" <Program>/<Routine> <rung number>',
+    '```',
+    '',
+    'For a rung that is not in the file yet, or for the change you are proposing:',
+    '',
+    '```',
+    'node "{{CLI}}" preview --text "<neutral text>" --comment "<rung comment>" --out "<export folder>/previews/proposed.svg"',
+    '```',
+    '',
+    'The same picture is **Studio 5000: Preview Rung** (the preview icon in the editor title of a',
+    '`.rll` file, or right-click). That draws the rung at the cursor beside the editor, including',
+    'text that is not saved yet.',
+    '',
+  ].join('\n');
+}
+
 /** Returns the files written; `skipped` collects hand-written files that were left alone. */
 export function writeGuides(
-  folder: string, projects: ProjectEntry[], template: string, tool: AiTool, skipped: string[], cliPath = 'cli.js'
+  folder: string, projects: ProjectEntry[], template: string, tool: AiTool, skipped: string[], cliPath = 'cli.js',
+  flags: GuideFlags = {},
 ): string[] {
   if (tool === 'None' || !projects.length) return [];
   const content = template
     .replace('{{PROJECT_TABLE}}', projectTable(folder, projects))
+    .replace('{{MAKING_CHANGES}}', makingChangesGuide(flags.editFileGenerated === true))
+    .replace('{{RUNG_PREVIEW}}', rungPreviewGuide(flags.rungPreview !== false))
     .replace(/\{\{CLI\}\}/g, cliPath.replace(/\\/g, '/'));
   const rels = tool === 'All' ? Object.values(TARGETS) : [TARGETS[tool]];
   const written: string[] = [];

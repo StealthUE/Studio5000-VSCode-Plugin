@@ -7,15 +7,22 @@
  *       (locations: Program/Routine#12 = rung 12, Program/Routine#L13 = ST line 13)
  *   node cli.js rung <exportDir> <Program>/<Routine> <number | L<line>>
  *       one rung with its comment, or an ST line with context
+ *   node cli.js preview <exportDir> <Program>/<Routine> <rung number> [--out <file.svg>]
+ *       ladder preview image (SVG) of that rung: comment, diagram, and the neutral text
+ *   node cli.js preview --text <neutral text> [--comment <text>] [--out <file.svg>]
+ *       the same image for a rung that is not in the file yet
  *
- * Reads only _model.json; nothing is written.
+ * xref and rung only read _model.json. preview writes one SVG.
  */
 
+import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { Controller, Routine } from './model';
 import { buildCrossRef, readModel, xrefLoc } from './export/exporter';
 import { buildAoiIndex } from './export/aoiIndex';
 import { isStRoutine, routineUnits } from './export/logicUnits';
+import { renderRungSvg } from './export/rungPreview';
 
 // Output piped into something that stops reading early (`| head`, an agent's pager) closes
 // stdout; that is a normal end, not an error.
@@ -146,19 +153,64 @@ function rung(dir: string, where: string, n: string): void {
   process.stdout.write(g.text + '\n');
 }
 
+const USAGE = [
+  'usage:',
+  '  cli.js xref <exportDir> <Tag[.Member]> [--program <Program>]',
+  '  cli.js rung <exportDir> <Program>/<Routine> <number | L<line>>',
+  '  cli.js preview <exportDir> <Program>/<Routine> <rung number> [--out <file.svg>]',
+  '  cli.js preview --text <neutral text> [--comment <text>] [--out <file.svg>]',
+].join('\n');
+
+function takeFlag(rest: string[], name: string): string | undefined {
+  const i = rest.indexOf(name);
+  if (i < 0) return undefined;
+  if (i + 1 >= rest.length || rest[i + 1]!.startsWith('--')) fail(`${name} needs a value.`);
+  const v = rest[i + 1]!;
+  rest.splice(i, 2);
+  return v;
+}
+
+function writeSvg(file: string, text: string, comment?: string, where?: string): void {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, renderRungSvg(text, { comment, where }), 'utf8');
+  process.stdout.write(path.resolve(file) + '\n');
+}
+
+function preview(args: string[]): void {
+  const text = takeFlag(args, '--text');
+  const comment = takeFlag(args, '--comment');
+  const out = takeFlag(args, '--out');
+  if (text !== undefined) {
+    if (!text.trim()) fail('preview --text needs the rung neutral text.');
+    writeSvg(out ?? path.join(os.tmpdir(), 'vs-studio5000', 'rung-preview.svg'), text, comment);
+    return;
+  }
+  const [dir, where, n] = args;
+  if (!dir || !where || n === undefined) fail(USAGE);
+  const c = load(dir);
+  const r = routineAt(c, where);
+  if (!r) fail(`Routine ${where} not found (use Program/Routine or "AOI Name/Routine").`);
+  if (isStRoutine(r)) fail(`${where} is Structured Text. A ladder preview is only for a rung; show the source.`);
+  const num = Number(n.replace(/^#/, ''));
+  const g = r.rungs.find(x => x.number === num);
+  if (!g) fail(`${where} has ${r.rungs.length} rungs; #${n} does not exist.`);
+  const safe = where.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\s+/g, '_');
+  const file = out ?? path.join(path.resolve(dir), 'previews', `${safe}__r${g.number}.svg`);
+  writeSvg(file, g.text, g.comment, `${where}  rung ${g.number}`);
+}
+
 function main(argv: string[]): void {
-  const [cmd, dir, ...rest] = argv;
-  const flag = (name: string) => {
-    const i = rest.indexOf(name);
-    return i >= 0 ? rest.splice(i, 2)[1] : undefined;
-  };
+  const [cmd, ...tail] = argv;
+  if (cmd === 'preview') { preview(tail); return; }
+  const [dir, ...rest] = tail;
+  const flag = (name: string) => takeFlag(rest, name);
   if (cmd === 'xref' && dir && rest[0]) {
     const program = flag('--program');
     xref(dir, rest[0], program);
   } else if (cmd === 'rung' && dir && rest[0] && rest[1]) {
     rung(dir, rest[0], rest[1]);
   } else {
-    fail('usage:\n  cli.js xref <exportDir> <Tag[.Member]> [--program <Program>]\n  cli.js rung <exportDir> <Program>/<Routine> <number | L<line>>');
+    fail(USAGE);
   }
 }
 

@@ -81,7 +81,28 @@ export interface ParsedRoutineFile {
   problems: string[];
 }
 
-export function parseRoutineFile(text: string): ParsedRoutineFile {
+/** A ladder rung plus the lines it occupies in the `.rll` file. Lines are 0-based. */
+export interface LocatedRung extends Rung {
+  /** Marker, comment, or first instruction, whichever comes first. */
+  startLine: number;
+  /** The line that ends the rung, or the last line of an unterminated one. */
+  endLine: number;
+}
+
+interface LocatedFile extends ParsedRoutineFile {
+  /** Closed rungs only, in file order. An unterminated tail is `open`, not one of these. */
+  rungs: LocatedRung[];
+  open?: LocatedRung;
+}
+
+function stripLocation(g: LocatedRung): Rung {
+  const rung: Rung = { number: g.number, text: g.text };
+  if (g.comment !== undefined) rung.comment = g.comment;
+  return rung;
+}
+
+/** Same read as `parseRoutineFile`, keeping the source line of each rung. */
+function parseLocated(text: string): LocatedFile {
   const header: RoutineHeader = { routine: '', type: 'RLL' };
   const problems: string[] = [];
   const descr: string[] = [];
@@ -112,9 +133,11 @@ export function parseRoutineFile(text: string): ParsedRoutineFile {
     return { header, rungs: [], lines: rest, problems };
   }
 
-  const rungs: Rung[] = [];
+  const rungs: LocatedRung[] = [];
   let comment: string[] = [];
   let pending = '';
+  let start = -1;
+  const begin = (line: number) => { if (start < 0) start = line; };
   for (; i < src.length; i++) {
     const raw = src[i]!;
     const l = raw.trim();
@@ -123,19 +146,57 @@ export function parseRoutineFile(text: string): ParsedRoutineFile {
     const cm = /^\/\/\s?>\s?(.*)$/.exec(raw.trimStart());
     if (cm) {
       if (pending) problems.push(`Line ${i + 1}: comment found inside an unterminated rung.`);
+      begin(i);
       comment.push(cm[1] ?? '');
       continue;
     }
-    if (l.startsWith('//')) continue;
+    if (l.startsWith('//')) { begin(i); continue; }
+    begin(i);
     pending += (pending ? ' ' : '') + l;
     if (l.endsWith(';')) {
-      const rung: Rung = { number: rungs.length, text: pending };
+      const rung: LocatedRung = { number: rungs.length, text: pending, startLine: start, endLine: i };
       if (comment.length) rung.comment = comment.join('\n');
       rungs.push(rung);
       pending = '';
       comment = [];
+      start = -1;
     }
   }
-  if (pending) problems.push(`Last rung is missing its terminating ";": ${pending.slice(0, 80)}`);
-  return { header, rungs, problems };
+  let open: LocatedRung | undefined;
+  if (pending) {
+    problems.push(`Last rung is missing its terminating ";": ${pending.slice(0, 80)}`);
+    open = { number: rungs.length, text: pending, startLine: start, endLine: src.length - 1 };
+    if (comment.length) open.comment = comment.join('\n');
+  }
+  return { header, rungs, open, problems };
+}
+
+export function parseRoutineFile(text: string): ParsedRoutineFile {
+  const file = parseLocated(text);
+  return { header: file.header, rungs: file.rungs.map(stripLocation), lines: file.lines, problems: file.problems };
+}
+
+export type RungAtLine =
+  | { header: RoutineHeader; rung: LocatedRung }
+  | { header: RoutineHeader; rung?: undefined; reason: 'st' | 'header' | 'none' };
+
+/**
+ * The rung at a cursor line in a routine file. `line` is 0-based, as in a text editor.
+ * A marker or `// >` comment belongs to the rung under it. A blank line between rungs
+ * belongs to the nearer one, and to the earlier one when the two are the same distance.
+ * `// @` header lines are not a rung.
+ */
+export function rungAtLine(text: string, line: number): RungAtLine {
+  const file = parseLocated(text);
+  if (file.header.type !== 'RLL') return { header: file.header, reason: 'st' };
+  const src = text.replace(/\r\n/g, '\n').split('\n');
+  if (/^\/\/\s*@/.test(src[line]?.trimStart() ?? '')) return { header: file.header, reason: 'header' };
+  let best: LocatedRung | undefined;
+  let bestDist = Infinity;
+  for (const rung of file.open ? [...file.rungs, file.open] : file.rungs) {
+    if (line >= rung.startLine && line <= rung.endLine) return { header: file.header, rung };
+    const dist = line < rung.startLine ? rung.startLine - line : line - rung.endLine;
+    if (dist < bestDist) { bestDist = dist; best = rung; }
+  }
+  return best ? { header: file.header, rung: best } : { header: file.header, reason: 'none' };
 }

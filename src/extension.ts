@@ -28,6 +28,7 @@ import { SafetySettings, safetyConfigFrom } from './export/analysis';
 import { isStRoutine, locText } from './export/logicUnits';
 import { AiTool, writeClaudeGuard, writeGuides } from './aiFiles';
 import { initLog, log, logPhase, logSessionStart, showLog } from './log';
+import { registerPreviewRung } from './previewRung';
 
 const projects = new Map<string, LoadedProject>();
 const key = (f: string) => path.resolve(f).toLowerCase();
@@ -245,7 +246,10 @@ function writeAiFiles(): void {
     const skipped: string[] = [];
     try {
       const written = writeGuides(folder, list.map(p => ({ file: p.file, exportDir: p.exportDir, health: p.health })),
-        template, tool, skipped, path.join(extensionRoot, 'out', 'cli.js'));
+        template, tool, skipped, path.join(extensionRoot, 'out', 'cli.js'), {
+          editFileGenerated: cfg('editFileGenerated', false),
+          rungPreview: cfg('rungPreview', true),
+        });
       for (const w of written) log('WRITE', `AI guide (${tool}) written: ${w}`);
       for (const s of skipped) log('SKIP', `${s} exists and was not written by this extension; left unchanged`);
       if (cfg('guardProjectFiles', true) && tool !== 'None' && writeClaudeGuard(folder)) {
@@ -535,7 +539,8 @@ export function activate(ctx: vscode.ExtensionContext): void {
   ctx.subscriptions.push(initLog(storageRoot, workspaceLabel));
   logSessionStart(String(ctx.extension.packageJSON.version), workspaceLabel);
   log('OPEN', `exports under ${cfg<string>('exportLocation', 'globalStorage') === 'workspace' ? `<workspace>/${WORKSPACE_EXPORT_DIR}` : storageRoot}; ` +
-    `AI tool ${cfg<string>('aiTool', 'Claude Code')}; auto export ${cfg('autoExport', true) ? 'on' : 'off'}`);
+    `AI tool ${cfg<string>('aiTool', 'Claude Code')}; edit file generated ${cfg('editFileGenerated', false) ? 'on' : 'off'}; ` +
+    `rung preview ${cfg('rungPreview', true) ? 'on' : 'off'}; auto export ${cfg('autoExport', true) ? 'on' : 'off'}`);
 
   tree = new ProjectTree(() => [...projects.values()]);
   editor = new ProjectEditorProvider({
@@ -585,6 +590,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
     }),
     cmd('studio5000.showLog', () => showLog()),
     cmd('studio5000.cleanExports', () => cmdCleanExports()),
+    registerPreviewRung(),
   );
 
   // Project files appearing, changing or disappearing.
@@ -628,8 +634,11 @@ export function activate(ctx: vscode.ExtensionContext): void {
   }));
   ctx.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
     if (!e.affectsConfiguration('studio5000')) return;
-    if (e.affectsConfiguration('studio5000.aiTool') || e.affectsConfiguration('studio5000.guardProjectFiles')) {
-      log('CONFIG', `AI settings changed (aiTool ${cfg<string>('aiTool', 'Claude Code')}, guard ${cfg('guardProjectFiles', true)}): rewriting guide files`);
+    const aiSettings = e.affectsConfiguration('studio5000.aiTool') || e.affectsConfiguration('studio5000.guardProjectFiles')
+      || e.affectsConfiguration('studio5000.editFileGenerated') || e.affectsConfiguration('studio5000.rungPreview');
+    if (aiSettings) {
+      log('CONFIG', `AI settings changed (aiTool ${cfg<string>('aiTool', 'Claude Code')}, guard ${cfg('guardProjectFiles', true)}, ` +
+        `edit file generated ${cfg('editFileGenerated', false) ? 'on' : 'off'}, rung preview ${cfg('rungPreview', true) ? 'on' : 'off'}): rewriting guide files`);
       writeAiFiles();
     }
     if (e.affectsConfiguration('studio5000.autoExport')) log('CONFIG', `auto export ${cfg('autoExport', true) ? 'on' : 'off'}`);
