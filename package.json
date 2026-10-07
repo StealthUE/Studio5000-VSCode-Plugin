@@ -3,7 +3,7 @@
   "publisher": "MassiveDynamicEngineering",
   "displayName": "VS Studio 5000",
   "description": "Read Rockwell Studio 5000 Logix Designer projects (.ACD and .L5X) in VS Code: ladder and Structured Text as text, AOIs, I/O tree, tag cross reference, safety checks, AI-ready docs, and edits packaged as L5X for import.",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "license": "MIT",
   "engines": {
     "vscode": "^1.74.0"
@@ -59,6 +59,16 @@
           "type": "boolean",
           "default": true,
           "description": "Add Claude Code deny rules to .claude/settings.json so the AI cannot read the binary .ACD directly and works from the export instead."
+        },
+        "studio5000.editFileGenerated": {
+          "type": "boolean",
+          "default": false,
+          "description": "On: the assistant edits the export and gives you an L5X file to import into Studio 5000. Off (default): it leaves the files alone and gives you the steps to make the change yourself. Changing this rewrites the AI guide."
+        },
+        "studio5000.rungPreview": {
+          "type": "boolean",
+          "default": true,
+          "description": "On: in chat, a rung is shown as a ladder picture instead of its neutral text, and Studio 5000: Preview Rung draws that picture beside a ladder routine. Off: the command is hidden and chat stays text. Changing this rewrites the AI guide."
         },
         "studio5000.exportLocation": {
           "type": "string",
@@ -173,7 +183,8 @@
       { "command": "studio5000.findTagUsage", "title": "Studio 5000: Find Tag Usage", "icon": "$(references)" },
       { "command": "studio5000.openRoutine", "title": "Open Routine" },
       { "command": "studio5000.showLog", "title": "Studio 5000: Show Activity Log", "icon": "$(output)" },
-      { "command": "studio5000.cleanExports", "title": "Studio 5000: Clean Up Exports", "icon": "$(trash)" }
+      { "command": "studio5000.cleanExports", "title": "Studio 5000: Clean Up Exports", "icon": "$(trash)" },
+      { "command": "studio5000.previewRung", "title": "Studio 5000: Preview Rung", "icon": "$(open-preview)" }
     ],
     "menus": {
       "view/title": [
@@ -193,11 +204,16 @@
       "explorer/context": [
         { "command": "studio5000.openProject", "when": "resourceExtname =~ /^\\.(acd|ACD|l5x|L5X)$/", "group": "7_modification" }
       ],
+      "editor/title": [
+        { "command": "studio5000.previewRung", "when": "editorLangId == rll && config.studio5000.rungPreview", "group": "navigation" }
+      ],
       "editor/context": [
-        { "command": "studio5000.findTagUsage", "when": "editorLangId == rll || editorLangId == logix-st", "group": "navigation@9" }
+        { "command": "studio5000.findTagUsage", "when": "editorLangId == rll || editorLangId == logix-st", "group": "navigation@9" },
+        { "command": "studio5000.previewRung", "when": "editorLangId == rll && config.studio5000.rungPreview", "group": "navigation@1" }
       ],
       "commandPalette": [
-        { "command": "studio5000.openRoutine", "when": "false" }
+        { "command": "studio5000.openRoutine", "when": "false" },
+        { "command": "studio5000.previewRung", "when": "editorLangId == rll && config.studio5000.rungPreview" }
       ]
     }
   },

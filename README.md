@@ -40,6 +40,9 @@ into Studio 5000 yourself.
 - **Command-line lookups** for AI tools. The exact command is written into the guide file:
   `node <extension>/out/cli.js xref <exportDir> Motor1.Run` lists writers and readers with their rung
   or ST line text; `cli.js rung <exportDir> Program/Routine L40` shows an ST line in context.
+- **Rung preview.** With `studio5000.rungPreview` on, a rung in chat is shown as a ladder picture
+  instead of its neutral text. **Studio 5000: Preview Rung** (the preview icon in the editor title,
+  or right-click in a `.rll` file) draws that same picture beside the editor, including unsaved text.
 - **Export docs** for people and AI:
 
   | File | Contents |
@@ -89,7 +92,7 @@ into Studio 5000 yourself.
 | Aliases | no | yes |
 | Source-protected routines and AOIs | listed | listed with the AOI's parameters |
 
-The ACD decoder has been checked against V31 projects (first created in V28) and against Studio 5000's
+The ACD decoder has been checked against V30 and V31 projects (first created in V28) and against Studio 5000's
 own L5X export of the same project. The format is undocumented. Anything the decoder cannot interpret
 is reported in `CODEBASE.md` under *Decoder notes* or *Routines not decoded*, and is never silently dropped.
 
@@ -99,6 +102,8 @@ is reported in `CODEBASE.md` under *Decoder notes* or *Routines not decoded*, an
 |---|---|---|
 | `studio5000.aiTool` | Claude Code | Which AI guide file(s) to write: CLAUDE.md, .clinerules, .cursorrules, copilot-instructions, All or None |
 | `studio5000.guardProjectFiles` | true | Add Claude Code deny rules so the AI cannot read the binary `.ACD` |
+| `studio5000.editFileGenerated` | off | On: the AI edits the export and you get an L5X file to import. Off: it leaves the files alone and gives you the steps to make the change yourself |
+| `studio5000.rungPreview` | true | In chat, a rung is a ladder picture instead of its neutral text. Also shows **Studio 5000: Preview Rung** on a ladder routine. Off: text only, command hidden |
 | `studio5000.autoExport` | true | Export on startup, and re-export when a project file changes |
 | `studio5000.exportLocation` | globalStorage | `workspace` writes exports to `.studio5000/` next to the project, so AI tools can read them without leaving the workspace (add the folder to `.gitignore`) |
 | `studio5000.safety.namePattern` | off | Opt-in regex: operand names to treat as safety-related without a safety class |
