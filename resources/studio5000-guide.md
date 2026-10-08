@@ -1,4 +1,4 @@
-<!-- vs-studio5000-guide v3 -->
+<!-- vs-studio5000-guide v4 -->
 # Studio 5000 projects in this workspace
 
 This folder contains Rockwell Studio 5000 Logix Designer projects. The **VS Studio 5000**
@@ -38,7 +38,8 @@ re-read. `missing` or `broken` means ask the user to run **Studio 5000: Re-expor
 | The logic itself | `Programs/<Program>/<Routine>.rll` (ladder) / `.st` (Structured Text) |
 
 Locations are written `Program/Routine#12` for rung 12 and `Program/Routine#L40` for line 40 of an
-ST routine (1-based, as Studio 5000 numbers ST lines). AOI routines are `AOI <Name>/<Routine>`.
+ST routine. Rungs are numbered from 0 and ST lines from 1, as Studio 5000 numbers them, so rung 12
+here is the rung the user sees numbered 12 in Studio 5000. AOI routines are `AOI <Name>/<Routine>`.
 
 ### One tag, fast
 
@@ -63,7 +64,7 @@ always uses full tag names (tag names are case-insensitive in Logix).
 // @type RLL
 // @description What the routine does
 
-// ---- Rung 0 ----              <- marker, regenerated; numbers are not significant
+// ---- Rung 0 ----              <- the rung's number in Studio 5000, as of the last export
 // > Comment for the rung below  <- "// >" lines are the rung comment (one or more lines)
 XIC(Start_PB)[OTE(Motor_Run) ,OTE(Lamp) ];
 ```
@@ -79,7 +80,9 @@ XIC(Start_PB)[OTE(Motor_Run) ,OTE(Lamp) ];
 - Tags: `Tag`, `Tag.Member`, `Tag[3].Bit`, `Tag.5` (bit of an integer), module I/O `Local:1:I.Data.0`.
   Program-scoped tags hide controller tags of the same name inside that program.
 - To add a rung, insert a new line (and optional `// >` comment lines) where it should go. To delete
-  a rung, remove its line. Rung numbers are recomputed when the edits are packaged.
+  a rung, remove its line. Do not renumber the markers: they are ignored when edits are packaged, and
+  rung numbers are recomputed. In an edited file, markers below an added or removed rung are out of
+  date; `xref`, `rung` and `preview` always number rungs as they are in the project.
 
 ### Structured Text (.st)
 
