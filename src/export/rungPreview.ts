@@ -21,6 +21,8 @@ export interface RungPreviewOptions {
   comment?: string;
   /** Where the rung lives, e.g. `Program/Routine  rung 3`. */
   where?: string;
+  /** Rung number, drawn left of the power rail where Studio 5000 shows it. */
+  rung?: number;
 }
 
 interface Glyph {
@@ -232,7 +234,9 @@ export function renderRungSvg(text: string, opts: RungPreviewOptions = {}): stri
   const margin = 16;
   const minWidth = 480;
   const body = tree ? (tree.length ? seriesGlyph(tree) : wire(48)) : undefined;
-  const sheet = Math.max(minWidth, margin + 28 + (body ? body.w : 360) + margin);
+  const number = body && opts.rung !== undefined ? String(opts.rung) : '';
+  const gutter = number ? textWidth(number, 13) + 12 : 0;
+  const sheet = Math.max(minWidth, margin + gutter + 28 + (body ? body.w : 360) + margin);
   const chars = Math.max(48, Math.floor((sheet - 32) / 7.1));
   const where = opts.where?.trim() ? wrap(opts.where.trim(), chars) : [];
   const comment = opts.comment?.trim() ? wrap(opts.comment.trim(), chars) : [];
@@ -257,15 +261,16 @@ export function renderRungSvg(text: string, opts: RungPreviewOptions = {}): stri
   const ladderTop = y;
   if (body) {
     const railIn = 12;
-    const left = margin + 16;
+    const left = margin + gutter + 16;
     const yIn = ladderTop + body.yWire;
     const yLow = ladderTop + body.yLow;
-    const railX1 = margin + 4;
+    const railX1 = margin + gutter + 4;
     const railX2 = width - margin - 4;
     const railTop = Math.min(yIn, yLow) - railIn;
     const railBot = Math.max(yIn, yLow) + railIn;
     parts.push(`<line x1="${railX1}" y1="${railTop}" x2="${railX1}" y2="${railBot}" stroke-width="3"/>`);
     parts.push(`<line x1="${railX2}" y1="${railTop}" x2="${railX2}" y2="${railBot}" stroke-width="3"/>`);
+    if (number) parts.push(label(margin + gutter - 6, yIn + 5, number, 13, '600', INK, 'end'));
     parts.push(hline(railX1, left, yIn));
     body.draw(left, ladderTop, parts);
     parts.push(hline(left + body.w, railX2, yIn));

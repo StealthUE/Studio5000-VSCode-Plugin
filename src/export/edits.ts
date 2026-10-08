@@ -27,8 +27,11 @@ export interface EditResult {
   st?: boolean;
   rungsBefore: number;
   rungsAfter: number;
-  /** Rungs (ST: lines) that are new or whose logic changed (layout-only changes excluded). */
-  changedRungs?: number;
+  /**
+   * Rungs (ST: 0-based lines) that are new or whose logic changed (layout-only changes excluded),
+   * numbered as in the edited routine.
+   */
+  changed?: number[];
 }
 
 export function pendingEdits(dir: string): string[] {
@@ -73,9 +76,9 @@ export function buildImports(dir: string): EditResult[] {
     });
     if (st) {
       const before = new Set(original?.lines ?? []);
-      res.changedRungs = (parsed.lines ?? []).filter(l => !before.has(l)).length;
+      res.changed = (parsed.lines ?? []).flatMap((l, i) => before.has(l) ? [] : [i]);
     } else {
-      res.changedRungs = rungs.filter(g => !originalText.has(canonicalRung(g.text))).length;
+      res.changed = rungs.flatMap(g => originalText.has(canonicalRung(g.text)) ? [] : [g.number]);
     }
     const edited: Routine = {
       name: f.routine,
@@ -99,6 +102,18 @@ function safe(s: string): string {
   return s.replace(/[<>:"/\\|?*]/g, '_');
 }
 
+/** Ascending numbers as `2, 5–9, 13`. */
+function ranges(nums: number[]): string {
+  const out: string[] = [];
+  for (let i = 0; i < nums.length; i++) {
+    let j = i;
+    while (j + 1 < nums.length && nums[j + 1] === nums[j]! + 1) j++;
+    out.push(j > i ? `${nums[i]}–${nums[j]}` : `${nums[i]}`);
+    i = j;
+  }
+  return out.join(', ');
+}
+
 function renderReport(c: Controller, results: EditResult[]): string {
   const L = [`# Import report — ${c.name}`, '', `Generated ${new Date().toLocaleString()}.`, ''];
   if (!results.length) {
@@ -116,7 +131,11 @@ function renderReport(c: Controller, results: EditResult[]): string {
     L.push(`## ${r.program ?? ''}/${r.routine}`, '');
     L.push(`- Source: \`${r.file}\``);
     L.push(r.l5x ? `- L5X: \`${r.l5x}\`` : `- **Not packaged:** ${r.skipped}`);
-    L.push(`- ${r.st ? 'Lines' : 'Rungs'}: ${r.rungsBefore} → ${r.rungsAfter}${r.changedRungs !== undefined ? ` (${r.changedRungs} new or changed)` : ''}`);
+    L.push(`- ${r.st ? 'Lines' : 'Rungs'}: ${r.rungsBefore} → ${r.rungsAfter}${r.changed !== undefined ? ` (${r.changed.length} new or changed)` : ''}`);
+    if (r.changed?.length) {
+      // Studio numbers rungs from 0 and ST lines from 1.
+      L.push(`- New or changed ${r.st ? 'lines' : 'rungs'}, numbered as after the import: ${ranges(r.changed.map(n => r.st ? n + 1 : n))}`);
+    }
     if (r.issues.length) {
       L.push('- Issues:');
       for (const i of r.issues) {
