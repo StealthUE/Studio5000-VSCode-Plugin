@@ -3,7 +3,7 @@
   "publisher": "MassiveDynamicEngineering",
   "displayName": "VS Studio 5000",
   "description": "Read Rockwell Studio 5000 Logix Designer projects (.ACD and .L5X) in VS Code: ladder and Structured Text as text, AOIs, I/O tree, tag cross reference, safety checks, AI-ready docs, and edits packaged as L5X for import.",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "license": "MIT",
   "engines": {
     "vscode": "^1.74.0"

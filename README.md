@@ -43,6 +43,13 @@ into Studio 5000 yourself.
 - **Rung preview.** With `studio5000.rungPreview` on, a rung in chat is shown as a ladder picture
   instead of its neutral text. **Studio 5000: Preview Rung** (the preview icon in the editor title,
   or right-click in a `.rll` file) draws that same picture beside the editor, including unsaved text.
+  The rung number is drawn left of the power rail, as in Studio 5000. A proposed rung is numbered with
+  `cli.js preview <exportDir> --at Program/Routine#12 [--insert] --text "…"`, which checks the number
+  against the project.
+- **Fixes name their rungs.** The AI guide has the assistant start every change with where it goes
+  (*Change rung 12*, *Add a rung after rung 12*, *Delete rung 12*, *Lines 40–42*), numbered from the
+  routine as it is in the project and listed from the bottom of the routine up, so each change can be
+  made in Studio 5000 without the next one's rung number moving.
 - **Export docs** for people and AI:
 
   | File | Contents |
@@ -59,7 +66,8 @@ into Studio 5000 yourself.
 - **Edits → L5X.** Change `.rll`/`.st` files, then run **Studio 5000: Build L5X Import from Edits**.
   Each edited routine is checked (ladder: brackets, `;`, known instructions; ST: brackets, comments,
   IF/CASE/FOR/WHILE/REPEAT blocks; both: undefined tags, missing JSR targets) and written to
-  `edits/<Program>__<Routine>.L5X`, with an `IMPORT_REPORT.md`. A status bar item counts the edits
+  `edits/<Program>__<Routine>.L5X`, with an `IMPORT_REPORT.md` that lists the numbers of the new and
+  changed rungs (ST: lines) in each routine. A status bar item counts the edits
   that have not been packaged. Edited files are kept if the project is re-exported.
   **Discard Edits** restores them. An edit means a change in what a routine *says*: its logic,
   comments, ST source or description. Re-layout, blank lines and export-format changes never count,
