@@ -44,6 +44,22 @@ export interface GuideFlags {
   rungPreview?: boolean;
 }
 
+/** How every change names its place, in both modes. */
+const WHERE_IT_GOES = [
+  'Start every change with where it goes, by rung number:',
+  '',
+  '- **Change rung 12** of `Program/Routine`: rung 12 as it is now, then as it should be.',
+  '- **Add a rung after rung 12** of `Program/Routine` (it becomes rung 13): the new rung.',
+  '- **Delete rung 12** of `Program/Routine`: rung 12 as it is now, so the user can check it.',
+  '- **Lines 40–42** of `Program/Routine` (Structured Text): the lines as they are now, then the new lines.',
+  '',
+  'Rungs are numbered from 0, as Studio 5000 shows them in the left margin. Take a rung number from',
+  '`xref`, `rung` or the `// ---- Rung n ----` marker of an unedited file, never by counting rungs.',
+  'Number every change from the routine as it is in the project, before any of your changes, and',
+  'list a routine\'s changes from the highest rung or line number to the lowest: then making one',
+  'change never moves a rung that a later change refers to.',
+];
+
 const FILE_STEPS = [
   '1. Edit the `.rll` / `.st` files in the export folder. Keep the `// @` header lines.',
   '2. Check tags exist (`TAGS.md`) and the instruction syntax matches existing logic. New tags must be',
@@ -53,6 +69,8 @@ const FILE_STEPS = [
   '   both: tags and JSR targets) and writes `edits/<Program>__<Routine>.L5X` plus `edits/IMPORT_REPORT.md`.',
   '4. Re-exporting keeps edited files, so they are not lost if the project reloads.',
   '   **Studio 5000: Discard Edits** restores them.',
+  '5. Tell the user every change you made, so they can check it in Studio 5000 after the import.',
+  '   `IMPORT_REPORT.md` lists the numbers of the new and changed rungs as they are after the import.',
 ];
 
 const NOT_PACKAGED = [
@@ -69,9 +87,12 @@ export function makingChangesGuide(editFile: boolean): string {
     return [
       '## Making changes',
       '',
-      'Do not edit the export. Give the user the change to make themselves in Studio 5000: the program,',
-      'the routine, the rung number or ST line, the rung comment, and the exact neutral text or',
-      'Structured Text to enter. List any new tags they must create. Leave every file as it is.',
+      'Do not edit the export. Give the user each change to make themselves in Studio 5000.',
+      '',
+      ...WHERE_IT_GOES,
+      '',
+      'Each rung you show has its comment and its exact neutral text; Structured Text is shown as',
+      'source. List any new tags they must create. Leave every file as it is.',
       '',
     ].join('\n');
   }
@@ -84,6 +105,10 @@ export function makingChangesGuide(editFile: boolean): string {
     '',
     ...NOT_PACKAGED,
     '',
+    'When you tell the user what you changed:',
+    '',
+    ...WHERE_IT_GOES,
+    '',
   ].join('\n');
 }
 
@@ -94,7 +119,8 @@ export function rungPreviewGuide(enabled: boolean): string {
       '## Rung previews',
       '',
       'Rung preview is off (`studio5000.rungPreview`). The Preview Rung command is hidden. When you',
-      'show a rung, show its comment and neutral text only. Do not make a ladder image.',
+      'show a rung, show where it is (`Program/Routine` rung 12), its comment and its neutral text.',
+      'Do not make a ladder image.',
       '',
     ].join('\n');
   }
@@ -103,10 +129,11 @@ export function rungPreviewGuide(enabled: boolean): string {
     '',
     'Rung preview is on (`studio5000.rungPreview`). When you show one rung, or propose a change to',
     'one, show a ladder picture of that rung in the chat instead of its neutral text. The picture',
-    'already contains the comment, the diagram and the neutral text. Do not draw the ladder yourself,',
-    'and do not paste the neutral text as well. For a change, show the current picture and the',
-    'proposed picture. A long list (a whole cross reference) stays text; preview the rung you are',
-    'discussing. Structured Text has no ladder preview; keep showing the source.',
+    'already contains the routine and rung number, the comment, the diagram and the neutral text. Do',
+    'not draw the ladder yourself, and do not paste the neutral text as well. For a change, show the',
+    'current picture and the proposed picture, and still write where the change goes in your text.',
+    'A long list (a whole cross reference) stays text; preview the rung you are discussing.',
+    'Structured Text has no ladder preview; keep showing the source.',
     '',
     'The picture is drawn from the rung text. The command prints the path of an SVG. Show that image.',
     '',
@@ -114,10 +141,12 @@ export function rungPreviewGuide(enabled: boolean): string {
     'node "{{CLI}}" preview "<export folder>" <Program>/<Routine> <rung number>',
     '```',
     '',
-    'For a rung that is not in the file yet, or for the change you are proposing:',
+    'For the rung you are proposing, `--at` gives its number: it replaces that rung, or with `--insert`',
+    'it is a new rung that takes that number (it goes in after the rung before it). The command checks',
+    'the routine and the number against the project and refuses a rung that does not exist.',
     '',
     '```',
-    'node "{{CLI}}" preview --text "<neutral text>" --comment "<rung comment>" --out "<export folder>/previews/proposed.svg"',
+    'node "{{CLI}}" preview "<export folder>" --at "<Program>/<Routine>#<rung number>" [--insert] --text "<neutral text>" --comment "<rung comment>"',
     '```',
     '',
     'The same picture is **Studio 5000: Preview Rung** (the preview icon in the editor title of a',

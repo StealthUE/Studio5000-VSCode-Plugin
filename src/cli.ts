@@ -9,8 +9,11 @@
  *       one rung with its comment, or an ST line with context
  *   node cli.js preview <exportDir> <Program>/<Routine> <rung number> [--out <file.svg>]
  *       ladder preview image (SVG) of that rung: comment, diagram, and the neutral text
- *   node cli.js preview --text <neutral text> [--comment <text>] [--out <file.svg>]
- *       the same image for a rung that is not in the file yet
+ *   node cli.js preview [<exportDir>] --text <neutral text> [--comment <text>]
+ *                       [--at <Program>/<Routine>#<n> [--insert]] [--out <file.svg>]
+ *       the same image for a rung that is not in the file yet. --at numbers it: it replaces
+ *       rung n, or with --insert it is a new rung n (after rung n-1). With the export folder
+ *       the routine and number are checked against the project.
  *
  * xref and rung only read _model.json. preview writes one SVG.
  */
@@ -22,7 +25,7 @@ import { Controller, Routine } from './model';
 import { buildCrossRef, readModel, xrefLoc } from './export/exporter';
 import { buildAoiIndex } from './export/aoiIndex';
 import { isStRoutine, routineUnits } from './export/logicUnits';
-import { renderRungSvg } from './export/rungPreview';
+import { RungPreviewOptions, renderRungSvg } from './export/rungPreview';
 
 // Output piped into something that stops reading early (`| head`, an agent's pager) closes
 // stdout; that is a normal end, not an error.
@@ -158,7 +161,7 @@ const USAGE = [
   '  cli.js xref <exportDir> <Tag[.Member]> [--program <Program>]',
   '  cli.js rung <exportDir> <Program>/<Routine> <number | L<line>>',
   '  cli.js preview <exportDir> <Program>/<Routine> <rung number> [--out <file.svg>]',
-  '  cli.js preview --text <neutral text> [--comment <text>] [--out <file.svg>]',
+  '  cli.js preview [<exportDir>] --text <neutral text> [--comment <text>] [--at <Program>/<Routine>#<n> [--insert]] [--out <file.svg>]',
 ].join('\n');
 
 function takeFlag(rest: string[], name: string): string | undefined {
@@ -170,33 +173,83 @@ function takeFlag(rest: string[], name: string): string | undefined {
   return v;
 }
 
-function writeSvg(file: string, text: string, comment?: string, where?: string): void {
+function takeSwitch(rest: string[], name: string): boolean {
+  const i = rest.indexOf(name);
+  if (i >= 0) rest.splice(i, 1);
+  return i >= 0;
+}
+
+function writeSvg(file: string, text: string, opts: RungPreviewOptions): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, renderRungSvg(text, { comment, where }), 'utf8');
+  fs.writeFileSync(file, renderRungSvg(text, opts), 'utf8');
   process.stdout.write(path.resolve(file) + '\n');
+}
+
+function fileSafe(where: string): string {
+  return where.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\s+/g, '_');
+}
+
+function ladderRoutine(c: Controller, where: string): Routine {
+  const r = routineAt(c, where);
+  if (!r) fail(`Routine ${where} not found (use Program/Routine or "AOI Name/Routine").`);
+  if (isStRoutine(r)) fail(`${where} is Structured Text. A ladder preview is only for a rung; show the source.`);
+  return r;
+}
+
+function rungRange(r: Routine): string {
+  return r.rungs.length ? `rungs 0–${r.rungs.length - 1}` : 'no rungs';
+}
+
+/**
+ * A rung that is not in the project yet. `at` (`Program/Routine#n`) numbers it: it replaces
+ * rung n, or with `insert` it goes in as a new rung n, after rung n-1. With the export folder
+ * the routine and the number are checked against the project.
+ */
+function proposed(text: string, comment: string | undefined, out: string | undefined, at: string | undefined, insert: boolean, dir: string | undefined): void {
+  if (!at) {
+    if (insert) fail('--insert needs --at <Program>/<Routine>#<rung number>.');
+    const file = out ?? (dir ? path.join(path.resolve(dir), 'previews', 'proposed.svg') : path.join(os.tmpdir(), 'vs-studio5000', 'rung-preview.svg'));
+    writeSvg(file, text, { comment });
+    return;
+  }
+  const m = /^(.+)#(\d+)$/.exec(at.trim());
+  if (!m) fail(`--at needs <Program>/<Routine>#<rung number>, e.g. MainProgram/Main#12 (got "${at}").`);
+  const where = m[1]!;
+  const n = Number(m[2]);
+  if (dir) {
+    const r = ladderRoutine(load(dir), where);
+    if (insert && n > r.rungs.length) fail(`${where} has ${rungRange(r)}; a new rung can go in as rung ${r.rungs.length} at most.`);
+    if (!insert && n >= r.rungs.length) fail(`${where} has ${rungRange(r)}; rung ${n} does not exist. For a new rung add --insert.`);
+  }
+  const label = insert
+    ? `${where}  new rung ${n}  (${n === 0 ? 'insert at the top' : `insert after rung ${n - 1}`})`
+    : `${where}  rung ${n}  (proposed)`;
+  const name = `${fileSafe(where)}__r${n}__${insert ? 'new' : 'proposed'}.svg`;
+  const file = out ?? (dir ? path.join(path.resolve(dir), 'previews', name) : path.join(os.tmpdir(), 'vs-studio5000', name));
+  writeSvg(file, text, { comment, where: label, rung: n });
 }
 
 function preview(args: string[]): void {
   const text = takeFlag(args, '--text');
   const comment = takeFlag(args, '--comment');
   const out = takeFlag(args, '--out');
+  const at = takeFlag(args, '--at');
+  const insert = takeSwitch(args, '--insert');
   if (text !== undefined) {
     if (!text.trim()) fail('preview --text needs the rung neutral text.');
-    writeSvg(out ?? path.join(os.tmpdir(), 'vs-studio5000', 'rung-preview.svg'), text, comment);
+    if (args.length > 1) fail(USAGE);
+    proposed(text, comment, out, at, insert, args[0]);
     return;
   }
+  if (at !== undefined || insert) fail('--at and --insert number a proposed rung; they go with --text.');
   const [dir, where, n] = args;
   if (!dir || !where || n === undefined) fail(USAGE);
-  const c = load(dir);
-  const r = routineAt(c, where);
-  if (!r) fail(`Routine ${where} not found (use Program/Routine or "AOI Name/Routine").`);
-  if (isStRoutine(r)) fail(`${where} is Structured Text. A ladder preview is only for a rung; show the source.`);
+  const r = ladderRoutine(load(dir), where);
   const num = Number(n.replace(/^#/, ''));
   const g = r.rungs.find(x => x.number === num);
-  if (!g) fail(`${where} has ${r.rungs.length} rungs; #${n} does not exist.`);
-  const safe = where.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\s+/g, '_');
-  const file = out ?? path.join(path.resolve(dir), 'previews', `${safe}__r${g.number}.svg`);
-  writeSvg(file, g.text, g.comment, `${where}  rung ${g.number}`);
+  if (!g) fail(`${where} has ${rungRange(r)}; #${n} does not exist.`);
+  const file = out ?? path.join(path.resolve(dir), 'previews', `${fileSafe(where)}__r${g.number}.svg`);
+  writeSvg(file, g.text, { comment: g.comment, where: `${where}  rung ${g.number}`, rung: g.number });
 }
 
 function main(argv: string[]): void {

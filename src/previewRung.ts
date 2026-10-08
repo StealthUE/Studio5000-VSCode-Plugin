@@ -51,7 +51,7 @@ export function registerPreviewRung(): vscode.Disposable {
       return;
     }
     const where = whereOf(hit.header, hit.rung.number);
-    show(`Rung ${hit.rung.number} · ${hit.header.routine || 'ladder'}`, renderRungSvg(hit.rung.text, { comment: hit.rung.comment, where }));
+    show(`Rung ${hit.rung.number} · ${hit.header.routine || 'ladder'}`, renderRungSvg(hit.rung.text, { comment: hit.rung.comment, where, rung: hit.rung.number }));
     log('OPEN', `rung preview ${where}`);
   });
   return vscode.Disposable.from(command, new vscode.Disposable(() => panel?.dispose()));
